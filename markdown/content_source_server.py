@@ -64,25 +64,39 @@ class ContentSourceServer:
         """
         self.port = port
         self.host = host
+        
+        # 设置日志
+        self.logger = self._setup_logging()
+        self.logger.info(f"🔧 初始化ContentSourceServer，端口: {port}, 主机: {host}")
+        
+        # 创建FastAPI应用
         self.app = FastAPI(
             title="Crawl4AI HTTP服务器",
             description="提供网页爬取和AI分析的API接口，集成MinIO存储和PostgreSQL数据库",
             version="2.0.0"
         )
-        self.logger = self._setup_logging()
+        
+        # 初始化AI提取器
+        self.logger.info("🤖 初始化AI提取器...")
         self.ai_extractor = AIExtractor()
         
         # 设置模板和静态文件
+        self.logger.info("📁 设置模板和静态文件...")
         self.templates = Jinja2Templates(directory="templates")
         
         # 初始化数据库和存储
+        self.logger.info("💾 初始化数据库和存储...")
         self._init_database_and_storage()
         
         # 设置路由
+        self.logger.info("🛣️ 设置API路由...")
         self._setup_routes()
         
         # 挂载静态文件
+        self.logger.info("📂 挂载静态文件...")
         self.app.mount("/static", StaticFiles(directory="static"), name="static")
+        
+        self.logger.info("✅ ContentSourceServer初始化完成")
         
     def _init_database_and_storage(self):
         """初始化数据库和MinIO存储"""
@@ -633,27 +647,48 @@ class ContentSourceServer:
     
     def run(self):
         """启动服务器"""
-        self.logger.info(f"🚀 启动网页爬取和AI分析服务器")
-        self.logger.info(f"📡 服务器地址: http://{self.host}:{self.port}")
-        self.logger.info(f"📚 API文档: http://{self.host}:{self.port}/docs")
-        self.logger.info(f"🔧 可用AI提供商: {self.ai_extractor.get_available_providers()}")
-        self.logger.info(f"🎯 可用AI模式: {self.ai_extractor.get_available_modes()}")
-        
-        uvicorn.run(
-            self.app,
-            host=self.host,
-            port=self.port,
-            log_level="info"
-        )
+        try:
+            self.logger.info(f"🚀 启动网页爬取和AI分析服务器")
+            self.logger.info(f"📡 服务器地址: http://{self.host}:{self.port}")
+            self.logger.info(f"📚 API文档: http://{self.host}:{self.port}/docs")
+            self.logger.info(f"🔧 可用AI提供商: {self.ai_extractor.get_available_providers()}")
+            self.logger.info(f"🎯 可用AI模式: {self.ai_extractor.get_available_modes()}")
+            
+            # 添加启动前的日志
+            self.logger.info("🔄 正在启动Uvicorn服务器...")
+            
+            uvicorn.run(
+                self.app,
+                host=self.host,
+                port=self.port,
+                log_level="info"
+            )
+        except Exception as e:
+            self.logger.error(f"❌ 服务器启动失败: {str(e)}")
+            raise
 
 
 def main():
     """主函数"""
     import argparse
     
+    # 从统一配置获取默认值
+    from config.config_loader import config_loader
+    
+    try:
+        # 加载配置
+        config_loader.load_config()
+        server_config = config_loader.get_server_config()
+        default_host = server_config.get('host', '0.0.0.0')
+        default_port = server_config.get('port', 8080)
+    except Exception as e:
+        print(f"⚠️ 无法加载配置文件，使用默认值: {e}")
+        default_host = '0.0.0.0'
+        default_port = 8080
+    
     parser = argparse.ArgumentParser(description="网页爬取和AI分析HTTP服务器")
-    parser.add_argument("--host", default="0.0.0.0", help="服务器主机地址")
-    parser.add_argument("--port", type=int, default=8000, help="服务器端口")
+    parser.add_argument("--host", default=default_host, help="服务器主机地址")
+    parser.add_argument("--port", type=int, default=default_port, help="服务器端口")
     
     args = parser.parse_args()
     

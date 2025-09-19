@@ -13,6 +13,7 @@
 - **数据持久化**: PostgreSQL数据库存储任务记录和元数据
 - **文件存储**: MinIO对象存储管理所有生成的文件
 - **历史记录**: 完整的爬取历史和文件管理功能
+- **统一配置管理**: 采用YAML格式的统一配置文件，支持配置验证和错误处理
 
 ### 🛠 技术架构
 - **后端框架**: FastAPI + Python 3.12
@@ -20,6 +21,7 @@
 - **对象存储**: MinIO
 - **前端**: HTML5 + CSS3 + JavaScript (原生)
 - **AI集成**: 支持多种LLM提供商（OpenAI、Azure OpenAI、本地LLM、通义千问）
+- **配置管理**: 统一的YAML配置文件，支持参数验证和类型检查
 
 ## 系统架构
 
@@ -34,6 +36,12 @@
                        │   Crawl4AI      │    │   MinIO         │
                        │   (爬取引擎)    │    │   (文件存储)    │
                        └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │  统一配置管理    │
+                       │  (YAML配置)     │
+                       └─────────────────┘
 ```
 
 ## 快速开始
@@ -49,43 +57,194 @@
 pip install -r requirements.txt
 ```
 
-### 配置文件
+## 🆕 统一配置管理
 
-#### 1. 数据库配置 (`config/database_config.py`)
-```python
-DATABASE_CONFIG = {
-    'host': 'your_postgres_host',
-    'port': 5432,
-    'database': 'your_database',
-    'username': 'your_username',
-    'password': 'your_password'
-}
-```
+### 配置文件结构
 
-#### 2. MinIO配置 (`config/minio_config.py`)
-```python
-MINIO_CONFIG = {
-    'endpoint': 'your_minio_host:9000',
-    'access_key': 'your_access_key',
-    'secret_key': 'your_secret_key',
-    'secure': False
-}
-```
+系统现在使用统一的YAML配置文件 `config/app_config.yaml` 来管理所有配置参数：
 
-#### 3. AI配置 (`config/ai_config.yaml`)
 ```yaml
-llm_providers:
+# 应用基础配置
+app:
+  name: "Crawl4AI Demo"
+  version: "2.0.0"
+  description: "智能网页爬取和AI分析系统"
+  debug: false
+
+# 服务器配置
+server:
+  host: "127.0.0.1"
+  port: 8080
+  workers: 4
+  timeout: 30
+  reload: false
+
+# PostgreSQL数据库配置
+database:
+  host: "localhost"
+  port: 5432
+  name: "crawl4ai_db"
+  username: "your_username"
+  password: "your_password"
+  # 连接池配置
+  pool:
+    size: 10
+    max_overflow: 20
+    timeout: 30
+    recycle: 3600
+
+# MinIO对象存储配置
+minio:
+  endpoint: "localhost:9000"
+  access_key: "your_access_key"
+  secret_key: "your_secret_key"
+  secure: false
+  region: "us-east-1"
+  # 存储桶配置
+  buckets:
+    default_bucket: "crawl4ai-files"
+    markdown_bucket: "crawl4ai-markdown"
+    ai_results_bucket: "crawl4ai-ai-results"
+    json_bucket: "crawl4ai-json"
+  # 上传配置
+  upload:
+    max_file_size: 104857600  # 100MB
+    allowed_extensions: [".md", ".json", ".txt", ".html"]
+    auto_create_buckets: true
+
+# AI服务配置
+ai:
+  default_provider: "qwen"
+  # OpenAI配置
   openai:
     api_key: "your_openai_api_key"
     base_url: "https://api.openai.com/v1"
-    model: "gpt-4"
-  # 其他提供商配置...
+    model: "gpt-3.5-turbo"
+    max_tokens: 4000
+    temperature: 0.7
+  # Azure OpenAI配置
+  azure_openai:
+    api_key: "your_azure_api_key"
+    endpoint: "https://your-resource.openai.azure.com/"
+    api_version: "2023-12-01-preview"
+    model: "gpt-35-turbo"
+  # 本地LLM配置
+  local_llm:
+    base_url: "http://localhost:11434/v1"
+    model: "llama2"
+    api_key: "not-needed"
+  # 通义千问配置
+  qwen:
+    api_key: "your_qwen_api_key"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: "qwen-turbo"
+  # AI提取配置
+  extraction:
+    modes:
+      content_summary: "请为以下内容生成一个简洁的摘要"
+      key_points: "请从以下内容中提取关键要点"
+      structured_data: "请将以下内容转换为结构化数据"
+    default_mode: "content_summary"
+  # 输出配置
+  output:
+    save_results: true
+    format: "markdown"
+
+# 爬取配置
+crawl:
+  content_sources: ["cleaned_html", "raw_html", "fit_html"]
+  default_source: "cleaned_html"
+  timeout:
+    page_load: 30
+    request: 10
+    total: 60
+  retry:
+    max_attempts: 3
+    delay: 1
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  files:
+    server: "logs/server.log"
+    ai_extraction: "logs/ai_extraction.log"
+    database: "logs/database.log"
+    minio: "logs/minio.log"
+
+# 安全配置
+security:
+  secret_key: "your-secret-key-here"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+
+# 缓存配置
+cache:
+  enabled: true
+  ttl: 3600  # 1小时
+  max_size: 1000
+
+# 监控配置
+monitoring:
+  enabled: true
+  metrics_endpoint: "/metrics"
+  health_check_interval: 30
 ```
+
+### 配置加载器使用
+
+系统提供了统一的配置加载器，支持配置验证和错误处理：
+
+```python
+from config.config_loader import config_loader
+
+# 获取完整配置
+config = config_loader.get_config()
+
+# 获取特定配置节
+db_config = config_loader.get_config('database')
+minio_config = config_loader.get_config('minio')
+
+# 获取数据库连接URL
+db_url = config_loader.get_database_url()
+
+# 获取MinIO端点
+minio_endpoint = config_loader.get_minio_endpoint()
+```
+
+### 配置验证功能
+
+系统内置了完善的配置验证机制：
+
+- **参数类型检查**: 验证配置参数的数据类型
+- **必填字段验证**: 检查必要配置项是否存在
+- **格式验证**: 验证URL、端口号、IP地址等格式
+- **范围验证**: 检查数值参数是否在有效范围内
+- **依赖关系验证**: 检查配置项之间的依赖关系
+
+配置验证会在系统启动时自动执行，如果发现错误会阻止系统启动并输出详细的错误信息。
+
+### 配置文件迁移
+
+如果你使用的是旧版本的配置文件，请按照以下步骤迁移：
+
+1. **备份现有配置**: 备份 `config/database_config.py` 和 `config/minio_config.py`
+2. **创建新配置文件**: 复制 `config/app_config.yaml` 模板
+3. **迁移配置参数**: 将旧配置文件中的参数迁移到新的YAML文件中
+4. **验证配置**: 运行系统验证配置是否正确
+
+### 配置最佳实践
+
+1. **环境变量支持**: 敏感信息（如密码、API密钥）建议使用环境变量
+2. **配置分层**: 开发、测试、生产环境使用不同的配置文件
+3. **版本控制**: 配置文件模板纳入版本控制，实际配置文件排除
+4. **定期备份**: 定期备份生产环境的配置文件
+5. **权限控制**: 限制配置文件的访问权限，保护敏感信息
 
 ### 启动服务
 
 ```bash
-# 启动服务器（默认端口8000）
+# 启动服务器（默认端口8080）
 python markdown/content_source_server.py
 
 # 指定端口启动
@@ -100,6 +259,84 @@ python markdown/content_source_server.py --host 0.0.0.0 --port 8080
 - **Web界面**: http://localhost:8080
 - **API文档**: http://localhost:8080/docs
 - **API信息**: http://localhost:8080/api
+
+## 项目结构
+
+```
+crawl4ai-demo/
+├── config/                          # 配置文件目录
+│   ├── app_config.yaml             # 🆕 统一配置文件
+│   ├── config_loader.py            # 🆕 配置加载器
+│   ├── config_validator.py         # 🆕 配置验证器
+│   ├── ai_config.yaml              # AI配置文件（保留兼容）
+│   ├── database_config.py          # 数据库配置模块（已更新）
+│   └── minio_config.py             # MinIO配置模块（已更新）
+├── models/                         # 数据模型
+│   └── database_models.py          # 数据库模型定义
+├── utils/                          # 工具模块
+│   └── ai_extractor.py             # AI提取器核心模块
+├── templates/                      # HTML模板
+│   └── index.html                  # 主页模板
+├── static/                         # 静态资源
+│   ├── css/style.css               # 样式文件
+│   └── js/app.js                   # JavaScript文件
+├── markdown/                       # 核心服务
+│   ├── content_source_example.py   # 详细功能演示
+│   ├── content_source_short_example.py # 简化功能演示
+│   └── content_source_server.py    # HTTP API服务器
+├── doc/                            # 输出文件目录
+├── logs/                           # 日志文件目录
+├── requirements.txt                # 依赖列表
+└── README.md                       # 项目文档
+```
+
+## 配置系统升级说明
+
+### 🆕 新增功能
+
+1. **统一配置文件**: 所有配置参数集中在 `config/app_config.yaml` 中管理
+2. **配置验证器**: 自动验证配置参数的正确性和完整性
+3. **类型安全**: 支持配置参数的类型检查和格式验证
+4. **错误处理**: 详细的配置错误提示和修复建议
+5. **配置加载器**: 提供便捷的配置访问接口
+
+### 🔄 迁移指南
+
+如果你正在从旧版本升级，请按照以下步骤操作：
+
+#### 步骤1: 备份现有配置
+```bash
+# 备份旧配置文件
+cp config/database_config.py config/database_config.py.bak
+cp config/minio_config.py config/minio_config.py.bak
+```
+
+#### 步骤2: 配置新的统一配置文件
+```bash
+# 编辑统一配置文件
+nano config/app_config.yaml
+```
+
+将你的数据库和MinIO配置参数迁移到新的YAML文件中。
+
+#### 步骤3: 验证配置
+```bash
+# 运行配置验证
+python -c "from config.config_loader import config_loader; print('配置验证通过' if config_loader else '配置验证失败')"
+```
+
+#### 步骤4: 测试系统
+```bash
+# 启动服务器测试
+python markdown/content_source_server.py --port 8080
+```
+
+### ⚠️ 重要提醒
+
+- 新版本的配置系统向后兼容，旧的配置文件仍然可以使用
+- 建议逐步迁移到新的统一配置系统以获得更好的管理体验
+- 配置验证功能会在系统启动时自动运行，确保配置的正确性
+- 如果遇到配置问题，请查看详细的错误日志进行排查
 
 ## 功能详解
 
@@ -169,52 +406,143 @@ curl -X POST "http://localhost:8080/crawl" \
 
 ## 开发指南
 
-### 项目结构
+### 项目结构说明
 
+#### 配置管理模块
+- `config/app_config.yaml`: 统一配置文件，包含所有系统配置
+- `config/config_loader.py`: 配置加载器，提供配置访问接口
+- `config/config_validator.py`: 配置验证器，确保配置参数正确性
+- `config/database_config.py`: 数据库配置模块（已更新为使用统一配置）
+- `config/minio_config.py`: MinIO配置模块（已更新为使用统一配置）
+
+#### 核心功能模块
+- `models/database_models.py`: 数据库模型定义
+- `utils/ai_extractor.py`: AI提取器核心模块
+- `markdown/content_source_server.py`: HTTP API服务器
+
+#### 前端资源
+- `templates/index.html`: 主页模板
+- `static/css/style.css`: 样式文件
+- `static/js/app.js`: JavaScript文件
+
+### 配置系统开发
+
+#### 添加新的配置项
+
+1. **在统一配置文件中添加配置项**:
+```yaml
+# config/app_config.yaml
+new_service:
+  enabled: true
+  endpoint: "http://localhost:3000"
+  timeout: 30
 ```
-crawl4ai-demo/
-├── config/                 # 配置文件
-│   ├── ai_config.yaml     # AI配置
-│   ├── database_config.py # 数据库配置
-│   └── minio_config.py    # MinIO配置
-├── models/                # 数据模型
-│   └── database_models.py # 数据库模型
-├── utils/                 # 工具模块
-│   └── ai_extractor.py    # AI提取器
-├── templates/             # HTML模板
-│   └── index.html         # 主页模板
-├── static/                # 静态资源
-│   ├── css/style.css      # 样式文件
-│   └── js/app.js          # JavaScript文件
-├── markdown/              # 核心服务
-│   └── content_source_server.py # 主服务器
-├── logs/                  # 日志文件
-├── requirements.txt       # 依赖列表
-└── README.md             # 项目文档
+
+2. **在配置验证器中添加验证逻辑**:
+```python
+# config/config_validator.py
+def _validate_new_service_config(self, service_config: Dict[str, Any]):
+    """验证新服务配置"""
+    if 'endpoint' in service_config:
+        endpoint = service_config['endpoint']
+        if not self._is_valid_url(endpoint):
+            self.errors.append(f"新服务端点格式无效: {endpoint}")
 ```
+
+3. **在配置加载器中添加访问方法**:
+```python
+# config/config_loader.py
+def get_new_service_config(self) -> Dict[str, Any]:
+    """获取新服务配置"""
+    return self.get_config('new_service')
+```
+
+#### 配置验证最佳实践
+
+1. **必填字段验证**: 检查关键配置项是否存在
+2. **类型验证**: 确保配置值的数据类型正确
+3. **格式验证**: 验证URL、端口号、IP地址等格式
+4. **范围验证**: 检查数值是否在合理范围内
+5. **依赖验证**: 检查配置项之间的依赖关系
 
 ### 扩展开发
 
 #### 添加新的AI分析模式：
-1. 在 `config/ai_config.yaml` 中添加新模式配置
+1. 在 `config/app_config.yaml` 中添加新模式配置:
+```yaml
+ai:
+  extraction:
+    modes:
+      new_analysis_mode: "请对以下内容进行新的分析..."
+```
+
 2. 在 `utils/ai_extractor.py` 中实现分析逻辑
 3. 更新前端界面选项
 
 #### 添加新的存储后端：
-1. 在 `config/` 目录创建新的配置文件
+1. 在 `config/app_config.yaml` 中添加新存储配置
 2. 实现存储管理器类
 3. 在服务器中集成新的存储后端
+4. 添加相应的配置验证逻辑
 
 ### 日志和监控
 
-#### 日志文件位置：
-- 服务器日志: `logs/server.log`
-- AI提取日志: `logs/ai_extraction.log`
+#### 日志配置
+系统使用统一的日志配置，支持多个日志文件：
 
-#### 日志级别：
-- INFO: 正常操作信息
-- ERROR: 错误信息
-- DEBUG: 调试信息（开发模式）
+```yaml
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  files:
+    server: "logs/server.log"
+    ai_extraction: "logs/ai_extraction.log"
+    database: "logs/database.log"
+    minio: "logs/minio.log"
+    config: "logs/config.log"
+```
+
+#### 日志级别说明：
+- **DEBUG**: 详细的调试信息，用于开发和故障排除
+- **INFO**: 正常操作信息，记录系统运行状态
+- **WARNING**: 警告信息，系统可以继续运行但需要注意
+- **ERROR**: 错误信息，系统遇到问题但可以恢复
+- **CRITICAL**: 严重错误，系统无法继续运行
+
+#### 监控功能
+```yaml
+monitoring:
+  enabled: true
+  metrics_endpoint: "/metrics"
+  health_check_interval: 30
+```
+
+### 安全最佳实践
+
+#### 配置文件安全
+1. **敏感信息保护**: 使用环境变量存储API密钥和密码
+2. **文件权限**: 限制配置文件的读写权限
+3. **版本控制**: 不要将包含敏感信息的配置文件提交到版本控制系统
+4. **配置加密**: 对于高敏感环境，考虑加密配置文件
+
+#### 示例环境变量配置
+```bash
+# .env 文件
+DATABASE_PASSWORD=your_secure_password
+MINIO_SECRET_KEY=your_minio_secret
+OPENAI_API_KEY=your_openai_key
+```
+
+在配置文件中引用：
+```yaml
+database:
+  password: "${DATABASE_PASSWORD}"
+minio:
+  secret_key: "${MINIO_SECRET_KEY}"
+ai:
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+```
 
 ## 部署指南
 
@@ -258,34 +586,295 @@ server {
 
 ## 故障排除
 
-### 常见问题
+### 故障排除
 
-#### 1. 数据库连接失败
-- 检查数据库配置信息
-- 确认数据库服务运行状态
-- 验证网络连接
+### 常见问题及解决方案
 
-#### 2. MinIO连接失败
-- 检查MinIO服务状态
-- 验证访问密钥配置
-- 确认存储桶权限
+#### 配置相关问题
 
-#### 3. AI分析失败
-- 检查API密钥配置
-- 验证网络连接
-- 查看AI服务配额
+**问题**: 配置文件加载失败
+```
+ConfigError: 配置文件不存在或无法读取
+```
+**解决方案**:
+1. 检查 `config/app_config.yaml` 文件是否存在
+2. 确认文件权限是否正确
+3. 验证YAML语法是否正确
+
+**问题**: 配置验证失败
+```
+ConfigValidationError: 数据库配置验证失败
+```
+**解决方案**:
+1. 检查配置文件中的必填字段是否完整
+2. 验证URL格式、端口号等是否正确
+3. 查看详细错误信息，修正相应配置项
+
+#### 数据库连接问题
+
+**问题**: PostgreSQL连接失败
+```
+DatabaseError: 无法连接到数据库
+```
+**解决方案**:
+1. 检查PostgreSQL服务是否运行
+2. 验证数据库连接配置（主机、端口、用户名、密码）
+3. 确认数据库是否存在
+4. 检查网络连接和防火墙设置
+
+**问题**: 数据库连接池耗尽
+```
+PoolTimeoutError: 连接池超时
+```
+**解决方案**:
+1. 增加连接池大小配置
+2. 检查是否有连接泄漏
+3. 优化数据库查询性能
+
+#### MinIO存储问题
+
+**问题**: MinIO连接失败
+```
+MinIOError: 无法连接到MinIO服务
+```
+**解决方案**:
+1. 检查MinIO服务是否运行
+2. 验证MinIO连接配置（端点、访问密钥、密钥）
+3. 确认存储桶是否存在
+4. 检查网络连接
+
+**问题**: 文件上传失败
+```
+UploadError: 文件上传到MinIO失败
+```
+**解决方案**:
+1. 检查文件大小是否超过限制
+2. 验证存储桶权限设置
+3. 确认磁盘空间是否充足
+
+#### AI服务问题
+
+**问题**: AI API调用失败
+```
+AIError: AI服务调用失败
+```
+**解决方案**:
+1. 检查API密钥是否正确
+2. 验证网络连接
+3. 确认API配额是否充足
+4. 检查请求格式是否正确
+
+### 调试技巧
+
+#### 启用调试模式
+在配置文件中设置：
+```yaml
+app:
+  debug: true
+logging:
+  level: "DEBUG"
+```
+
+#### 查看日志文件
+```bash
+# 查看服务器日志
+tail -f logs/server.log
+
+# 查看配置加载日志
+tail -f logs/config.log
+
+# 查看数据库操作日志
+tail -f logs/database.log
+```
+
+#### 配置验证测试
+```python
+# 测试配置验证
+from config.config_validator import config_validator
+from config.config_loader import config_loader
+
+# 加载并验证配置
+config_loader.load_config()
+print("配置验证通过")
+```
+
+### 性能监控
+
+#### 系统资源监控
+```yaml
+monitoring:
+  enabled: true
+  metrics:
+    - cpu_usage
+    - memory_usage
+    - disk_usage
+    - network_io
+```
+
+#### 数据库性能监控
+```yaml
+database:
+  monitoring:
+    slow_query_log: true
+    connection_pool_stats: true
+    query_timeout: 30
+```
+
+#### MinIO性能监控
+```yaml
+minio:
+  monitoring:
+    bandwidth_limit: "100MB"
+    request_timeout: 30
+    health_check_interval: 60
+```
 
 ### 性能优化
 
-#### 1. 数据库优化
-- 添加适当的索引
-- 定期清理历史数据
-- 使用连接池
+#### 配置优化建议
 
-#### 2. 存储优化
-- 配置MinIO缓存
-- 使用CDN加速
-- 压缩存储文件
+##### 数据库性能优化
+```yaml
+database:
+  # 连接池优化
+  pool:
+    min_size: 5          # 最小连接数
+    max_size: 20         # 最大连接数
+    max_overflow: 10     # 超出最大连接数的额外连接
+    pool_timeout: 30     # 获取连接超时时间
+    pool_recycle: 3600   # 连接回收时间
+  
+  # 查询优化
+  query:
+    timeout: 30          # 查询超时时间
+    echo: false          # 是否打印SQL语句
+    pool_pre_ping: true  # 连接前预检查
+```
+
+##### MinIO存储优化
+```yaml
+minio:
+  # 连接优化
+  connection:
+    timeout: 30          # 连接超时时间
+    retry_attempts: 3    # 重试次数
+    retry_delay: 1       # 重试延迟
+  
+  # 上传优化
+  upload:
+    chunk_size: 8388608  # 分块上传大小 (8MB)
+    max_concurrent: 5    # 最大并发上传数
+    compression: true    # 启用压缩
+  
+  # 存储桶优化
+  buckets:
+    default_bucket: "crawl4ai-data"
+    image_bucket: "crawl4ai-images"
+    document_bucket: "crawl4ai-docs"
+    versioning: true     # 启用版本控制
+```
+
+##### AI服务优化
+```yaml
+ai:
+  # 请求优化
+  request:
+    timeout: 60          # 请求超时时间
+    max_retries: 3       # 最大重试次数
+    retry_delay: 2       # 重试延迟
+  
+  # 缓存优化
+  cache:
+    enabled: true        # 启用缓存
+    ttl: 3600           # 缓存过期时间
+    max_size: 1000      # 最大缓存条目数
+  
+  # 并发控制
+  concurrency:
+    max_concurrent: 3    # 最大并发请求数
+    rate_limit: 60       # 每分钟最大请求数
+```
+
+#### 系统性能监控
+
+##### 应用性能指标
+```yaml
+monitoring:
+  performance:
+    # 响应时间监控
+    response_time:
+      warning_threshold: 2000   # 警告阈值(ms)
+      critical_threshold: 5000  # 严重阈值(ms)
+    
+    # 内存使用监控
+    memory:
+      warning_threshold: 80     # 警告阈值(%)
+      critical_threshold: 90    # 严重阈值(%)
+    
+    # CPU使用监控
+    cpu:
+      warning_threshold: 70     # 警告阈值(%)
+      critical_threshold: 85    # 严重阈值(%)
+```
+
+##### 性能调优建议
+
+1. **数据库调优**:
+   - 根据并发量调整连接池大小
+   - 启用查询缓存和索引优化
+   - 定期分析慢查询日志
+
+2. **存储调优**:
+   - 使用适当的分块大小进行文件上传
+   - 启用压缩减少存储空间
+   - 配置合适的存储桶策略
+
+3. **AI服务调优**:
+   - 实现请求缓存减少API调用
+   - 控制并发请求数避免限流
+   - 优化提示词提高响应质量
+
+4. **系统调优**:
+   - 启用日志轮转避免磁盘满
+   - 配置合适的超时时间
+   - 实现健康检查和自动恢复
+
+#### 缓存策略
+
+##### Redis缓存配置（可选）
+```yaml
+cache:
+  redis:
+    enabled: false       # 是否启用Redis缓存
+    host: "localhost"
+    port: 6379
+    db: 0
+    password: ""
+    
+    # 缓存策略
+    strategies:
+      ai_results:
+        ttl: 3600        # AI结果缓存1小时
+        max_size: 1000   # 最大缓存条目
+      
+      web_content:
+        ttl: 1800        # 网页内容缓存30分钟
+        max_size: 500    # 最大缓存条目
+```
+
+##### 内存缓存配置
+```yaml
+cache:
+  memory:
+    enabled: true        # 启用内存缓存
+    max_size: 100        # 最大缓存条目数
+    ttl: 1800           # 默认过期时间(秒)
+    
+    # 缓存清理策略
+    cleanup:
+      interval: 300      # 清理间隔(秒)
+      strategy: "lru"    # 清理策略(lru/fifo)
+```
 
 ## 贡献指南
 

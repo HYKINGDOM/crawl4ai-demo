@@ -13,18 +13,12 @@ from sqlalchemy.exc import SQLAlchemyError
 import psycopg2
 from psycopg2 import sql
 
+# 导入统一配置加载器
+from .config_loader import config_loader
+
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# 数据库配置
-DATABASE_CONFIG = {
-    'host': '10.0.203.172',
-    'port': 5432,
-    'database': 'user_tZGjBb',
-    'username': 'user_tZGjBb',
-    'password': 'password_fajJed'
-}
 
 # SQLAlchemy 基类
 Base = declarative_base()
@@ -41,22 +35,22 @@ class DatabaseManager:
     def _initialize_connection(self):
         """初始化数据库连接"""
         try:
+            # 从统一配置文件获取数据库配置
+            db_config = config_loader.get_database_config()
+            
             # 构建数据库连接URL
-            database_url = (
-                f"postgresql://{DATABASE_CONFIG['username']}:"
-                f"{DATABASE_CONFIG['password']}@"
-                f"{DATABASE_CONFIG['host']}:"
-                f"{DATABASE_CONFIG['port']}/"
-                f"{DATABASE_CONFIG['database']}"
-            )
+            database_url = config_loader.get_database_url()
+            
+            # 获取连接池配置
+            pool_config = db_config.get('pool', {})
             
             # 创建数据库引擎
             self.engine = create_engine(
                 database_url,
-                pool_size=10,
-                max_overflow=20,
-                pool_pre_ping=True,
-                echo=False  # 设置为True可以看到SQL语句
+                pool_size=pool_config.get('size', 10),
+                max_overflow=pool_config.get('max_overflow', 20),
+                pool_pre_ping=pool_config.get('pre_ping', True),
+                echo=pool_config.get('echo', False)  # 设置为True可以看到SQL语句
             )
             
             # 创建会话工厂

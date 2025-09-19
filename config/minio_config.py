@@ -13,26 +13,12 @@ from urllib.parse import urljoin
 import hashlib
 import json
 
+# 导入统一配置加载器
+from .config_loader import config_loader
+
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# MinIO配置信息
-MINIO_CONFIG = {
-    'endpoint': '10.0.203.172:9000',
-    'access_key': 'minio_mB5rB7',
-    'secret_key': 'minio_fndehr',
-    'secure': False,  # HTTP连接，不使用HTTPS
-    'region': 'us-east-1'
-}
-
-# 存储桶配置
-BUCKET_CONFIG = {
-    'default_bucket': 'crawl4ai-files',
-    'markdown_bucket': 'crawl4ai-markdown',
-    'ai_results_bucket': 'crawl4ai-ai-results',
-    'json_bucket': 'crawl4ai-json'
-}
 
 class MinIOManager:
     """MinIO存储管理器类"""
@@ -40,7 +26,9 @@ class MinIOManager:
     def __init__(self):
         """初始化MinIO管理器"""
         self.client = None
-        self.base_url = f"http://{MINIO_CONFIG['endpoint']}"
+        # 从统一配置文件获取MinIO配置
+        self.minio_config = config_loader.get_minio_config()
+        self.base_url = config_loader.get_minio_endpoint()
         self._initialize_client()
         self._ensure_buckets_exist()
     
@@ -48,11 +36,11 @@ class MinIOManager:
         """初始化MinIO客户端"""
         try:
             self.client = Minio(
-                endpoint=MINIO_CONFIG['endpoint'],
-                access_key=MINIO_CONFIG['access_key'],
-                secret_key=MINIO_CONFIG['secret_key'],
-                secure=MINIO_CONFIG['secure'],
-                region=MINIO_CONFIG['region']
+                endpoint=self.minio_config['endpoint'],
+                access_key=self.minio_config['access_key'],
+                secret_key=self.minio_config['secret_key'],
+                secure=self.minio_config.get('secure', False),
+                region=self.minio_config.get('region', 'us-east-1')
             )
             logger.info("MinIO客户端初始化成功")
         except Exception as e:
@@ -62,7 +50,9 @@ class MinIOManager:
     def _ensure_buckets_exist(self):
         """确保所有必要的存储桶存在"""
         try:
-            for bucket_name in BUCKET_CONFIG.values():
+            # 从配置文件获取存储桶配置
+            bucket_config = self.minio_config.get('buckets', {})
+            for bucket_name in bucket_config.values():
                 if not self.client.bucket_exists(bucket_name):
                     self.client.make_bucket(bucket_name)
                     logger.info(f"创建存储桶: {bucket_name}")
@@ -101,7 +91,8 @@ class MinIOManager:
             (成功标志, MinIO URL, 文件信息)
         """
         if bucket_name is None:
-            bucket_name = BUCKET_CONFIG['default_bucket']
+            bucket_config = self.minio_config.get('buckets', {})
+            bucket_name = bucket_config.get('default', 'crawl4ai-files')
         
         try:
             # 获取文件信息
@@ -165,7 +156,8 @@ class MinIOManager:
             (成功标志, MinIO URL, 文件信息)
         """
         if bucket_name is None:
-            bucket_name = BUCKET_CONFIG['default_bucket']
+            bucket_config = self.minio_config.get('buckets', {})
+            bucket_name = bucket_config.get('default', 'crawl4ai-files')
         
         try:
             # 将内容转换为字节
@@ -348,12 +340,16 @@ minio_manager = MinIOManager()
 
 def get_bucket_for_file_type(file_type: str) -> str:
     """根据文件类型获取对应的存储桶"""
+    # 从统一配置文件获取存储桶配置
+    minio_config = config_loader.get_minio_config()
+    bucket_config = minio_config.get('buckets', {})
+    
     bucket_mapping = {
-        'markdown': BUCKET_CONFIG['markdown_bucket'],
-        'json': BUCKET_CONFIG['json_bucket'],
-        'ai_result': BUCKET_CONFIG['ai_results_bucket']
+        'markdown': bucket_config.get('markdown', 'crawl4ai-markdown'),
+        'json': bucket_config.get('json', 'crawl4ai-json'),
+        'ai_result': bucket_config.get('ai_results', 'crawl4ai-ai-results')
     }
-    return bucket_mapping.get(file_type, BUCKET_CONFIG['default_bucket'])
+    return bucket_mapping.get(file_type, bucket_config.get('default', 'crawl4ai-files'))
 
 def generate_object_key(filename: str, task_id: int = None, timestamp: str = None) -> str:
     """生成MinIO对象键"""
