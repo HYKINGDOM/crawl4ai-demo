@@ -1,0 +1,22 @@
+# 基础依赖
+crawl4ai
+openai
+pyyaml
+fastapi
+uvicorn
+aiohttp
+
+# 数据库相关
+psycopg2-binary
+sqlalchemy
+alembic
+
+# 对象存储
+minio
+
+# Web界面相关
+jinja2
+python-multipart
+
+# 其他工具
+python-dotenv

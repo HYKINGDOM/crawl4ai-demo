@@ -1,0 +1,118 @@
+# AI配置文件 - 支持多种LLM提供商
+# 请根据需要配置相应的API密钥和端点
+
+# OpenAI配置
+openai:
+  api_key: "your-openai-api-key-here"
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-3.5-turbo"
+  max_tokens: 2000
+  temperature: 0.1
+
+# Azure OpenAI配置
+azure_openai:
+  api_key: "your-azure-openai-api-key"
+  endpoint: "https://your-resource.openai.azure.com/"
+  api_version: "2024-02-15-preview"
+  deployment_name: "gpt-35-turbo"
+  max_tokens: 2000
+  temperature: 0.1
+
+# 本地LLM配置（如Ollama）
+local_llm:
+  base_url: "http://localhost:11434"
+  model: "llama2"
+  max_tokens: 2000
+  temperature: 0.1
+
+# 通义千问配置
+qwen:
+  api_key: "sk"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+  model: "qwen3-max-preview"
+  max_tokens: 20000
+  temperature: 0.1
+
+# 默认使用的LLM提供商
+default_provider: "qwen"
+
+# AI提取配置
+extraction:
+  # 数据提取模式
+  modes:
+    - "structured_data"    # 结构化数据提取
+    - "content_summary"    # 内容摘要
+    - "key_points"         # 关键点提取
+    - "entities"           # 实体识别
+    - "sentiment"          # 情感分析
+  
+  # 默认提取模式
+  default_mode: "structured_data"
+  
+  # 提取提示词模板
+  prompts:
+    structured_data: |
+      请从以下网页内容中提取结构化数据，以JSON格式返回：
+      - 标题
+      - 主要内容摘要
+      - 关键词
+      - 发布时间（如果有）
+      - 作者信息（如果有）
+      
+      网页内容：
+      {content}
+    
+    content_summary: |
+      请为以下网页内容生成一个简洁的摘要（不超过200字）：
+      
+      {content}
+    
+    key_points: |
+      请从以下网页内容中提取5-10个关键要点，以列表形式返回：
+      
+      {content}
+    
+    entities: |
+      请从以下网页内容中识别并提取以下类型的实体：
+      - 人名
+      - 地名
+      - 组织机构
+      - 时间
+      - 产品名称
+      
+      以JSON格式返回结果。
+      
+      网页内容：
+      {content}
+    
+    sentiment: |
+      请分析以下网页内容的情感倾向，返回：
+      - 情感极性：正面/负面/中性
+      - 情感强度：1-10分
+      - 情感关键词
+      
+      网页内容：
+      {content}
+
+# 输出配置
+output:
+  # 是否保存AI提取结果
+  save_results: true
+  
+  # 输出格式
+  formats:
+    - "json"
+    - "markdown"
+    - "txt"
+  
+  # 默认输出格式
+  default_format: "json"
+  
+  # 文件命名模式
+  filename_pattern: "ai_extract_{mode}_{timestamp}"
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/ai_extraction.log"

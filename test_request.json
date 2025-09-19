@@ -1,0 +1,5 @@
+{
+  "url": "https://httpbin.org/html",
+  "ai_modes": ["content_summary"],
+  "save_files": true
+}
